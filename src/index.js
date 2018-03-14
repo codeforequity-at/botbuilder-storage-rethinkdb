@@ -79,11 +79,12 @@ class RethinkDbStorage {
   }
 
   saveData (context, data, callback) {
-    debug(`saveData (${util.inspect(context)},${util.inspect(data)} ) called`)
+    debug(`asdf saveData (${util.inspect(context)},${JSON.stringify(data, null, 2)} ) called`)
     this.initializeStorageClient().then(() => {
       async.parallel({
         userData: (userDataReady) => {
           if (context.persistUserData && context.userId) {
+            const cleanData = r.literal(JSON.parse(JSON.stringify(data.userData || {})))
             const t = r.table(this.tableUserData)
             t.getAll([ context.userId ], { index: this.indexUserData })
               .limit(1).nth(0).default(null)
@@ -91,10 +92,10 @@ class RethinkDbStorage {
                 if (err) return userDataReady(err)
                 if (doc) {
                   t.get(doc.id)
-                    .update({ data: data.userData || {}, updated_at: r.now() })
+                    .update({ data: cleanData, updated_at: r.now() })
                     .run(this.connection, userDataReady)
                 } else {
-                  t.insert({ userId: context.userId, data: data.userData || {}, created_at: r.now(), updated_at: r.now() })
+                  t.insert({ userId: context.userId, data: cleanData, created_at: r.now(), updated_at: r.now() })
                     .run(this.connection, userDataReady)
                 }
               })
@@ -104,6 +105,7 @@ class RethinkDbStorage {
         },
         conversationData: (conversationDataReady) => {
           if (context.persistConversationData && context.conversationId) {
+            const cleanData = r.literal(JSON.parse(JSON.stringify(data.conversationData || {})))
             const t = r.table(this.tableConversationData)
             t.getAll([ context.conversationId ], { index: this.indexConversationData })
               .limit(1).nth(0).default(null)
@@ -111,10 +113,10 @@ class RethinkDbStorage {
                 if (err) return conversationDataReady(err)
                 if (doc) {
                   t.get(doc.id)
-                    .update({ data: data.conversationData || {}, updated_at: r.now() })
+                    .update({ data: cleanData, updated_at: r.now() })
                     .run(this.connection, conversationDataReady)
                 } else {
-                  t.insert({ conversationId: context.conversationId, data: data.conversationData || {}, created_at: r.now(), updated_at: r.now() })
+                  t.insert({ conversationId: context.conversationId, data: cleanData, created_at: r.now(), updated_at: r.now() })
                     .run(this.connection, conversationDataReady)
                 }
               })
@@ -124,6 +126,7 @@ class RethinkDbStorage {
         },
         privateConversationData: (privateConversationDataReady) => {
           if (context.userId && context.conversationId) {
+            const cleanData = r.literal(JSON.parse(JSON.stringify(data.privateConversationData || {})))
             const t = r.table(this.tablePrivateConversationData)
             t.getAll([ context.userId, context.conversationId ], { index: this.indexPrivateConversationData })
               .limit(1).nth(0).default(null)
@@ -131,10 +134,10 @@ class RethinkDbStorage {
                 if (err) return privateConversationDataReady(err)
                 if (doc) {
                   t.get(doc.id)
-                    .update({ data: data.privateConversationData || {}, updated_at: r.now() })
+                    .update({ data: cleanData, updated_at: r.now() })
                     .run(this.connection, privateConversationDataReady)
                 } else {
-                  t.insert({ userId: context.userId, conversationId: context.conversationId, data: data.privateConversationData || {}, created_at: r.now(), updated_at: r.now() })
+                  t.insert({ userId: context.userId, conversationId: context.conversationId, data: cleanData, created_at: r.now(), updated_at: r.now() })
                     .run(this.connection, privateConversationDataReady)
                 }
               })
