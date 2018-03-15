@@ -79,7 +79,7 @@ class RethinkDbStorage {
   }
 
   saveData (context, data, callback) {
-    debug(`asdf saveData (${util.inspect(context)},${JSON.stringify(data, null, 2)} ) called`)
+    debug(`saveData (${util.inspect(context)},${JSON.stringify(data, null, 2)} ) called`)
     this.initializeStorageClient().then(() => {
       async.parallel({
         userData: (userDataReady) => {
