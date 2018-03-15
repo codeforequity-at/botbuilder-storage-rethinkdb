@@ -1,4 +1,6 @@
-# MS Bot Framework RethinkDB Storage
+# Bot Builder RethinkDB Storage
+
+**Attention: [Bot Framework State Service will cease operating on March 31st 2018](https://blog.botframework.com/2017/12/19/bot-state-service-will-soon-retired-march-31st-2018/), so you should switch your bot to another storage adapter - like this one - soon!**
 
 [![NPM](https://nodei.co/npm/botbuilder-storage-rethinkdb.png)](https://nodei.co/npm/botbuilder-storage-rethinkdb/)
 
@@ -69,16 +71,94 @@ All 3 of these tables include:
 * a "created_at" column
 * a "updated_at" column
 
+## Data Migration
 
+Here are some hints how I migrated existing conversation state data from the Bot Framework State Service to my local RethinkDB.
 
+First, I enabled a special "migration" mode by setting an environment variable. In migration mode, the old storage adapter is used, but the RethinkDB storage adapter is initialized and connected:
 
+```
+const storage = new RethinkDbStorage({
+  ...
+});
 
+if (process.env.MIGRATE_STORAGE) {
+  require('./migrate')(bot, storage);
+} else {
+  bot.set('storage', storage);
+}
+...
+```
 
+The migrate.js file loads all existing user addresses from my Redis session store, starts an empty dialog of each of them, making the conversation state data available in the session, and finally stores the conversation state data in RethinkDB.
 
+```
+const async = require('async');
+const Redis = require('ioredis');
 
+module.exports = (bot, storage) => {
 
+  var migratedCount = 0;
+  var errorCount = 0;
 
+  const redis = new Redis({
+    host: ...,
+    port: ...,
+    showFriendlyErrorStack: true
+  });
 
+  bot.dialog('/migrate', (session) => {
+    console.log('MIGRATING USER ' + session.message.address.user.name);
+  
+    const context = {
+      persistUserData: true,
+      userId: session.message.address.user.id,
+      persistConversationData: true,
+      conversationId: session.message.address.conversation.id
+    };
+    const data = {
+      userData: session.userData,
+      conversationData: session.conversationData,
+      privateConversationData: session.privateConversationData
+    }
+    
+    storage.saveData(context, data, (err) => {
+      if (err) {
+        console.log('SAVEDATA FAILED: ' + err)
+        errorCount++;
+      } else {
+        migratedCount++;
+      }
+      console.log('CURRENTLY MIGRATED: ' + migratedCount + ', ERRORS: ' + errorCount);
+    })
+  })
+
+  async.waterfall([
+
+    (getKeysDone) => {
+      redis.keys('bot:user:*', getKeysDone);
+    },
+    
+    (keys, getValuesDone) => {
+      redis.mget(keys, getValuesDone);
+    },
+
+    (values, done) => {
+      console.log('MIGRATING ' + values.length + ' bot users');
+      
+      values.forEach((address) => {
+        bot.beginDialog(JSON.parse(address), '/migrate');
+      })
+      done()
+    }
+  ], (err) => {
+    if (err) {
+      console.log('MIGRATE FAILED: ' + err);
+    }
+  });
+};
+
+```
 
 ## License
 MIT
